@@ -1,0 +1,8 @@
+[package]
+name = "ml"
+version = "0.1.0"
+authors = ["Greg Tatum <tatum.creative@gmail.com>"]
+
+[dependencies]
+term-painter = "0.2.4"
+byteorder = "1.2.1"
