@@ -126,12 +126,13 @@ fn read_in_labels(path: &str) -> Result<Vec<u8>, Error> {
     Ok(labels)
 }
 
+/// Outputs the image to the terminal using ascii art.
 pub fn output_image(images: &Images, index: usize) -> String {
     let &Images {
         dimensions: (width, height),
         ref list,
         ref labels,
-        pixel_count: _,
+        ..
     } = images;
 
     let image = list.get(index).unwrap();
