@@ -1,14 +1,16 @@
 extern crate rand;
 use self::rand::distributions::{IndependentSample, Range};
 use image_data::Images;
-use std::f64::consts::E;
+use std::{cell::RefCell, f64::consts::E, iter::zip};
 
 #[derive(Debug)]
 pub struct Node {
     // The weights are edges in a graph that point back to the nodes in the previous
     // layer.
     weights: Vec<f64>,
+    cost: f64,
     bias: f64,
+    activation: RefCell<f64>,
 }
 
 /// A network layer. This can be the hidden layers and the output layer. The input
@@ -34,9 +36,22 @@ impl Layer {
                     .map(|_| between.ind_sample(&mut random))
                     .collect(),
                 bias: between.ind_sample(&mut random),
+                cost: 0.0,
+                activation: RefCell::new(0.0),
             });
         }
         Layer(nodes)
+    }
+
+    pub fn len(&self) -> usize {
+        return self.0.len();
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Node> + '_ {
+        self.0.iter()
+    }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Node> + '_ {
+        self.0.iter_mut()
     }
 }
 
@@ -51,6 +66,8 @@ pub struct Network {
     /// The layers include the hidden, and output layers. The input layer is provided
     /// by the images.
     pub layers: Vec<Layer>,
+    // The pixel_count for the images.
+    pub input_node_count: usize,
     /// The hidden layers are between the input and the output. They do the computation
     /// and their node counts are independent from the input and output node count.
     pub hidden_layer_count: usize,
@@ -68,33 +85,27 @@ impl Network {
         hidden_node_count: usize,
         output_node_count: usize,
     ) -> Network {
-        // Initialize the hidden network layers plus 1 output layer.
-        let layers = (0..(hidden_layer_count + 1))
-            .map(|layer_index| {
-                // The hidden layers all have the same node count in this design,
-                // but the first hidden layer needs to compute the weights for
-                // the inpute image.
-                let previous_node_count = if layer_index == 0 {
-                    images.pixel_count
-                } else {
-                    hidden_node_count
-                };
+        let input_node_count = images.pixel_count;
+        let mut layers = Vec::with_capacity(hidden_node_count + 2);
+        let mut prev_node_count = 0;
 
-                // The node count only changes for the last layer, which is the output
-                // layer.
-                let node_count = if layer_index == hidden_layer_count {
-                    output_node_count
-                } else {
-                    hidden_node_count
-                };
+        // Add the input layer.
+        layers.push(Layer::new(input_node_count, prev_node_count));
+        prev_node_count = input_node_count;
 
-                Layer::new(node_count, previous_node_count)
-            })
-            .collect();
+        // Add the hidden layers.
+        for _ in 0..hidden_layer_count {
+            layers.push(Layer::new(hidden_node_count, prev_node_count));
+            prev_node_count = hidden_node_count;
+        }
+
+        // Add the output layer
+        layers.push(Layer::new(output_node_count, prev_node_count));
 
         Network {
             images,
             layers,
+            input_node_count,
             hidden_layer_count,
             hidden_node_count,
             output_node_count,
@@ -105,55 +116,52 @@ impl Network {
     /// it would be better to use a linear algebra library, but for this didactic
     /// implementation, I'm doing the linear algebra myself.
     pub fn run(&self, image_index: usize) -> Vec<f64> {
-        let image_data = self.images.list.get(image_index).unwrap();
+        {
+            let image_data = self.images.list.get(image_index).unwrap();
+            let input_layer = self.layers.first().expect("Failed to get first layer.");
 
-        let image_layer = image_data
-            .iter()
-            // Images come in as u8 ranged 0-255, map them to f64 ranged 0-1.
-            .map(|i| (*i as f64) / 255f64)
-            .collect();
-
-        let mut hidden_layer_activations1 = Vec::with_capacity(self.hidden_node_count);
-        let mut hidden_layer_activations2 = Vec::with_capacity(self.hidden_node_count);
-        let mut output_activations = Vec::with_capacity(self.output_node_count);
-        let mut ping_pong = 0;
-
-        for (layer_index, layer) in self.layers.iter().enumerate() {
-            // Select the activations buffer in and out by ping ponging between them.
-            ping_pong = (ping_pong + 1) % 2;
-            let (mut activations_in, mut activations_out) = if ping_pong == 0 {
-                (&hidden_layer_activations1, &mut hidden_layer_activations2)
-            } else {
-                (&hidden_layer_activations2, &mut hidden_layer_activations1)
-            };
-
-            if layer_index == 0 {
-                // This is the first hidden layer, use the initial image layer as input.
-                activations_in = &image_layer;
-            }
-
-            if layer_index == self.layers.len() - 1 {
-                // This is the last layer, use the output layer.
-                activations_out = &mut output_activations;
-            }
-
-            // Clear any previous intermediate activations.
-            activations_out.clear();
-
-            for Node { weights, bias } in &layer.0 {
-                let mut multiplication_result = 0f64;
-
-                for (i, weight) in weights.iter().enumerate() {
-                    let input_node = activations_in
-                        .get(i)
-                        .expect("Failed to get an input node value.");
-                    multiplication_result += weight * input_node;
-                }
-
-                activations_out.push(sigmoid(multiplication_result + bias));
+            for (node, pixel) in zip(input_layer.iter(), image_data) {
+                // Images come in as u8 ranged 0-255, map them to f64 ranged 0-1.
+                *node.activation.borrow_mut() = (*pixel as f64) / 255f64
             }
         }
-        output_activations
+
+        for window in self.layers.windows(2) {
+            let input_layer = &window[0];
+            let output_layer = &window[1];
+
+            for node in output_layer.iter() {
+                let mut multiplication_result = 0f64;
+
+                for (input_node, weight) in zip(input_layer.iter(), &node.weights) {
+                    multiplication_result += weight * *input_node.activation.borrow();
+                }
+
+                *node.activation.borrow_mut() = sigmoid(multiplication_result + node.bias);
+            }
+        }
+
+        self.layers
+            .last()
+            .expect("Failed to get last layer.")
+            .iter()
+            .map(|node| *node.activation.borrow())
+            .collect()
+    }
+
+    fn cost(&self, answer_index: usize) -> Vec<f64> {
+        let mut answer_vec = vec![0.0; self.output_node_count];
+        let answer_node = answer_vec
+            .get_mut(answer_index)
+            .expect("Network does not have enough output nodes for that answer");
+        *answer_node = 1.0;
+
+        let layer = self.layers.last().expect("Failed to get last layer.");
+        let cost_vec = zip(layer.iter(), &answer_vec)
+            .map(|(node, answer)| *answer - *node.activation.borrow())
+            .collect::<Vec<f64>>();
+
+        cost_vec
     }
 }
 
@@ -165,13 +173,15 @@ fn sigmoid(value: f64) -> f64 {
     1.0 / (1.0 + E.powf(value))
 }
 
+fn average_cost() {}
+
 #[cfg(test)]
 mod test {
     use super::*;
     #[test]
     fn network_layer() {
         let layer = Layer::new(3, 2);
-        assert_eq!(layer.0.len(), 3, "There were three node weights created");
+        assert_eq!(layer.len(), 3, "There were three node weights created");
         for nodes in layer.0 {
             assert_eq!(
                 nodes.weights.len(),
@@ -204,22 +214,32 @@ mod test {
             output_node_count,
         );
 
-        assert_eq!(network.layers.len(), hidden_layer_count + 1);
+        assert_eq!(network.layers.len(), hidden_layer_count + 2);
 
-        let layer0 = network.layers.get(0).unwrap();
-        let layer1 = network.layers.get(1).unwrap();
-        let layer2 = network.layers.get(2).unwrap();
+        let input_layer = network.layers.get(0).unwrap();
+        let hidden_layer_1 = network.layers.get(1).unwrap();
+        let hidden_layer_2 = network.layers.get(2).unwrap();
+        let output_layer = network.layers.get(3).unwrap();
 
-        assert_eq!(layer0.0.len(), hidden_node_count);
-        assert_eq!(layer0.0.get(0).unwrap().weights.len(), pixel_count);
+        assert_eq!(input_layer.len(), pixel_count);
+        assert_eq!(input_layer.0.get(0).unwrap().weights.len(), 0);
 
-        assert_eq!(layer1.0.len(), hidden_node_count);
-        assert_eq!(layer1.0.get(0).unwrap().weights.len(), hidden_node_count);
+        assert_eq!(hidden_layer_1.len(), hidden_node_count);
+        assert_eq!(hidden_layer_1.0.get(0).unwrap().weights.len(), pixel_count);
 
-        assert_eq!(layer2.0.len(), output_node_count);
-        assert_eq!(layer2.0.get(0).unwrap().weights.len(), hidden_node_count);
+        assert_eq!(hidden_layer_2.len(), hidden_node_count);
+        assert_eq!(
+            hidden_layer_2.0.get(0).unwrap().weights.len(),
+            hidden_node_count
+        );
 
-        assert_eq!(network.layers.get(3).is_none(), true);
+        assert_eq!(output_layer.len(), output_node_count);
+        assert_eq!(
+            output_layer.0.get(0).unwrap().weights.len(),
+            hidden_node_count
+        );
+
+        assert_eq!(network.layers.get(4).is_none(), true);
     }
 
     #[test]
