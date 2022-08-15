@@ -1,17 +1,17 @@
-extern crate term_painter;
 extern crate byteorder;
+extern crate term_painter;
 
+use self::byteorder::{BigEndian, ReadBytesExt};
+use std::convert::From;
+use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use std::fs::File;
-use std::convert::From;
-use self::byteorder::{BigEndian, ReadBytesExt};
 
 // Collect all potential error messages here:
 #[derive(Debug)]
 pub enum Error {
     Message(&'static str), // No reason to over-complicate with specific enums.
-    IO(io::Error)
+    IO(io::Error),
 }
 
 impl From<io::Error> for Error {
@@ -27,7 +27,7 @@ pub struct Images {
     pub dimensions: (usize, usize),
     pub pixel_count: usize,
     pub list: Vec<ImageData>,
-    pub labels: Vec<u8>
+    pub labels: Vec<u8>,
 }
 
 fn read_in_images(path: &str) -> Result<Images, Error> {
@@ -53,7 +53,9 @@ fn read_in_images(path: &str) -> Result<Images, Error> {
             let bytes_per_image = number_of_rows * number_of_cols;
 
             if magic_number != 2051 {
-                return Err(Error::Message("The image data's magic number is not correct."));
+                return Err(Error::Message(
+                    "The image data's magic number is not correct.",
+                ));
             }
 
             let mut images = Vec::with_capacity(number_of_images as usize);
@@ -62,13 +64,13 @@ fn read_in_images(path: &str) -> Result<Images, Error> {
                 let mut image: Vec<u8> = Vec::with_capacity(bytes_per_image as usize);
 
                 // Read the data in from the file.
-                file
-                    .take(bytes_per_image as u64)
-                    .read_to_end(&mut image)?;
+                file.take(bytes_per_image as u64).read_to_end(&mut image)?;
 
                 // Double check that what we read in agrees with the header.
                 if image.len() != bytes_per_image {
-                    return Err(Error::Message("An image being read in was truncated and not the expected length"));
+                    return Err(Error::Message(
+                        "An image being read in was truncated and not the expected length",
+                    ));
                 }
 
                 images.push(image);
@@ -80,8 +82,8 @@ fn read_in_images(path: &str) -> Result<Images, Error> {
                 list: images,
                 labels: Vec::new(),
             })
-        },
-        Err(err) => Err(Error::IO(err))
+        }
+        Err(err) => Err(Error::IO(err)),
     }
 }
 
@@ -105,7 +107,9 @@ fn read_in_labels(path: &str) -> Result<Vec<u8>, Error> {
 
     // Assert that the header makes sense.
     if magic_number != 2049 {
-        return Err(Error::Message("The image data's magic number is not correct."));
+        return Err(Error::Message(
+            "The image data's magic number is not correct.",
+        ));
     }
 
     // Slurp out the labels.
@@ -114,7 +118,9 @@ fn read_in_labels(path: &str) -> Result<Vec<u8>, Error> {
 
     // Verify the length
     if labels.len() != number_of_items {
-        return Err(Error::Message("The data read in for labels is not the correct length as stated by the header."));
+        return Err(Error::Message(
+            "The data read in for labels is not the correct length as stated by the header.",
+        ));
     }
 
     Ok(labels)
@@ -125,7 +131,7 @@ pub fn output_image(images: &Images, index: usize) -> String {
         dimensions: (width, height),
         ref list,
         ref labels,
-        pixel_count: _
+        pixel_count: _,
     } = images;
 
     let image = list.get(index).unwrap();
@@ -150,14 +156,14 @@ pub fn output_image(images: &Images, index: usize) -> String {
     string
 }
 
-pub fn load_in_test_images () -> Result<Images, Error> {
+pub fn load_in_test_images() -> Result<Images, Error> {
     let labels = read_in_labels("./data/t10k-labels-idx1-ubyte")?;
     let mut images = read_in_images("./data/t10k-images-idx3-ubyte")?;
     images.labels = labels;
     Ok(images)
 }
 
-pub fn load_in_training_images () -> Result<Images, Error> {
+pub fn load_in_training_images() -> Result<Images, Error> {
     let labels = read_in_labels("./data/train-labels-idx1-ubyte")?;
     let mut images = read_in_images("./data/train-images-idx3-ubyte")?;
     images.labels = labels;
