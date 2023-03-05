@@ -1,5 +1,5 @@
 [package]
-name = "text-encoding"
+name = "text-embedding"
 version = "0.1.0"
 authors = ["Greg Tatum <tatum.creative@gmail.com>"]
 edition = "2018"
