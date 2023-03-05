@@ -1,5 +1,4 @@
-extern crate ml;
-use ml::image_data::*;
+use feed_forward::image_data::*;
 
 /// This example shows off a sample of the training data from the terminal.
 /// For example:

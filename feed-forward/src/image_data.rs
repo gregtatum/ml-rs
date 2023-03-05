@@ -174,9 +174,20 @@ pub fn load_in_training_images() -> Result<Images, Error> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::env;
+
+    /// The data paths are relative to the root of the project.
+    fn set_cwd() {
+        let cwd = env::current_dir().unwrap();
+        if cwd.file_name().unwrap() == "feed-forward" {
+            // Go up a directory.
+            env::set_current_dir(cwd.parent().unwrap()).unwrap();
+        }
+    }
 
     #[test]
     fn load_test() {
+        set_cwd();
         let images = load_in_test_images().unwrap();
         assert_eq!(
             images.list.len(),
@@ -187,6 +198,7 @@ mod test {
 
     #[test]
     fn load_training() {
+        set_cwd();
         let images = load_in_training_images().unwrap();
         assert_eq!(
             images.list.len(),

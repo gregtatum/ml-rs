@@ -1,6 +1,5 @@
-extern crate rand;
-use self::rand::distributions::{IndependentSample, Range};
-use image_data::Images;
+use crate::image_data::Images;
+use rand::distributions::{IndependentSample, Range};
 use std::{cell::RefCell, f64::consts::E, iter::zip};
 
 #[derive(Debug)]

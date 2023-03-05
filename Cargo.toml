@@ -1,9 +1,10 @@
-[package]
-name = "ml"
-version = "0.1.0"
-authors = ["Greg Tatum <tatum.creative@gmail.com>"]
+[workspace]
+members = [
+    "feed-forward",
+    "text-encoding",
+]
 
-[dependencies]
+[workspace.dependencies]
 term-painter = "0.2.4"
 byteorder = "1.2.1"
 rand = "0.4.1"
