@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "feed-forward",
-    "text-encoding",
+    "text-embedding",
 ]
 
 [workspace.dependencies]

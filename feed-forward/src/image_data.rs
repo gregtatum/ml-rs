@@ -158,15 +158,15 @@ pub fn output_image(images: &Images, index: usize) -> String {
 }
 
 pub fn load_in_test_images() -> Result<Images, Error> {
-    let labels = read_in_labels("./data/t10k-labels-idx1-ubyte")?;
-    let mut images = read_in_images("./data/t10k-images-idx3-ubyte")?;
+    let labels = read_in_labels("./data/mnist/t10k-labels-idx1-ubyte")?;
+    let mut images = read_in_images("./data/mnist/t10k-images-idx3-ubyte")?;
     images.labels = labels;
     Ok(images)
 }
 
 pub fn load_in_training_images() -> Result<Images, Error> {
-    let labels = read_in_labels("./data/train-labels-idx1-ubyte")?;
-    let mut images = read_in_images("./data/train-images-idx3-ubyte")?;
+    let labels = read_in_labels("./data/mnist/train-labels-idx1-ubyte")?;
+    let mut images = read_in_images("./data/mnist/train-images-idx3-ubyte")?;
     images.labels = labels;
     Ok(images)
 }
